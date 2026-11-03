@@ -1,0 +1,500 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&display=swap");
+:root {
+  font-family: "DM Sans", sans-serif;
+  color: #292b26;
+  background: #f6f5f1;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-width: 320px;
+}
+.top {
+  height: 76px;
+  padding: 0 max(calc((100vw - 1120px) / 2), 6vw);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e7e5de;
+}
+.brand {
+  font-size: 23px;
+  letter-spacing: -1.3px;
+  font-weight: 700;
+  text-decoration: none;
+  color: #292b26;
+}
+.brand span,
+.accent {
+  color: #d17650;
+}
+.top-note {
+  font-size: 12px;
+  color: #77786f;
+}
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #e7e9dc;
+  display: grid;
+  place-items: center;
+  font:
+    13px "DM Mono",
+    monospace;
+}
+.shell {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 72px 30px 0;
+}
+.intro {
+  max-width: 590px;
+  margin: 0 auto 56px;
+  text-align: center;
+}
+.eyebrow,
+.step {
+  font:
+    10px "DM Mono",
+    monospace;
+  letter-spacing: 1.2px;
+  color: #8d8d80;
+}
+.eyebrow {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 9px;
+}
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 9px;
+  background: #87906c;
+}
+h1 {
+  font-size: clamp(48px, 7vw, 76px);
+  line-height: 0.99;
+  letter-spacing: -4px;
+  margin: 22px 0 18px;
+  font-weight: 600;
+}
+h1 em {
+  font-family: "Playfair Display", serif;
+  font-weight: 600;
+  color: #889071;
+}
+.intro p {
+  font-size: 15px;
+  line-height: 1.7;
+  color: #77786f;
+  max-width: 435px;
+  margin: auto;
+}
+.panel {
+  background: #fff;
+  border: 1px solid #ebe9e2;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px #38372c08;
+}
+.setup {
+  max-width: 760px;
+  margin: auto;
+  padding: 30px 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+}
+.setup h2,
+.home-banner h2 {
+  font-size: 25px;
+  letter-spacing: -0.8px;
+  margin: 9px 0 5px;
+}
+.setup p,
+.mini-form p {
+  margin: 0;
+  color: #85857b;
+  font-size: 13px;
+}
+.form-row {
+  display: flex;
+  gap: 8px;
+}
+.setup .form-row {
+  min-width: 365px;
+}
+.input,
+input {
+  font: inherit;
+}
+input {
+  background: #fafaf8;
+  border: 1px solid #e5e3dc;
+  border-radius: 5px;
+  padding: 11px 12px;
+  min-width: 0;
+  outline: 0;
+  color: #30322d;
+}
+input:focus {
+  border-color: #929a78;
+  box-shadow: 0 0 0 3px #929a781c;
+}
+button {
+  font:
+    600 12px "DM Sans",
+    sans-serif;
+  background: #33382e;
+  color: white;
+  border: 0;
+  border-radius: 5px;
+  padding: 0 15px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    transform 0.15s;
+}
+button:hover:not(:disabled) {
+  background: #59624a;
+  transform: translateY(-1px);
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.setup button {
+  height: 42px;
+}
+.alert {
+  position: relative;
+  max-width: 760px;
+  margin: -32px auto 24px;
+  padding: 13px 42px 13px 16px;
+  background: #fff0eb;
+  color: #a4472d;
+  border: 1px solid #f1d1c7;
+  border-radius: 5px;
+  font-size: 13px;
+}
+.alert span {
+  font-weight: 700;
+  margin-right: 10px;
+}
+.alert button {
+  position: absolute;
+  right: 8px;
+  top: 7px;
+  background: transparent;
+  color: #a4472d;
+  font-size: 20px;
+  padding: 0 8px;
+}
+.home-banner {
+  max-width: 900px;
+  margin: 0 auto 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e5e3dc;
+  padding: 0 2px 18px;
+}
+.home-banner h2 {
+  font-size: 30px;
+}
+.home-icon {
+  font-size: 28px;
+  color: #90967b;
+}
+.forms-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  max-width: 900px;
+  margin: auto;
+}
+.mini-form {
+  padding: 22px 24px;
+}
+.mini-form h3 {
+  font-size: 18px;
+  letter-spacing: -0.4px;
+  margin: 9px 0 5px;
+}
+.mini-form .form-row {
+  margin-top: 17px;
+}
+.mini-form input {
+  width: 100%;
+  font-size: 12px;
+}
+.mini-form button {
+  padding: 0 13px;
+}
+.amount-input {
+  max-width: 100px;
+}
+.bills-section {
+  max-width: 900px;
+  margin: 52px auto 0;
+}
+.section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 17px;
+}
+.section-heading h2 {
+  font-size: 24px;
+  letter-spacing: -0.7px;
+  margin: 8px 0 0;
+}
+.count {
+  font:
+    12px "DM Mono",
+    monospace;
+  color: #96978c;
+  vertical-align: middle;
+}
+.muted {
+  font-size: 12px;
+  color: #88887d;
+  margin-bottom: 4px;
+}
+.empty {
+  padding: 38px;
+  text-align: center;
+}
+.empty-mark {
+  display: grid;
+  place-items: center;
+  background: #f1f2eb;
+  color: #879071;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  margin: auto;
+  font-size: 18px;
+}
+.empty h3 {
+  margin: 15px 0 6px;
+  font-size: 16px;
+}
+.empty p {
+  font-size: 13px;
+  color: #89897f;
+  margin: 0;
+}
+.bill-list {
+  display: grid;
+  gap: 12px;
+}
+.bill-card {
+  background: #fff;
+  border: 1px solid #ebe9e2;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.bill-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 22px;
+  border-bottom: 1px solid #efeee9;
+}
+.bill-head h3 {
+  font-size: 17px;
+  margin: 5px 0 0;
+}
+.bill-total {
+  text-align: right;
+}
+.bill-total span {
+  display: block;
+  font:
+    9px "DM Mono",
+    monospace;
+  letter-spacing: 1px;
+  color: #97968c;
+  margin-bottom: 3px;
+}
+.bill-total strong {
+  font-size: 17px;
+}
+.share {
+  min-height: 57px;
+  display: flex;
+  align-items: center;
+  padding: 0 22px;
+  gap: 11px;
+  border-bottom: 1px solid #f1f0ec;
+}
+.share:last-child {
+  border-bottom: 0;
+}
+.person-dot {
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #eeeede;
+  display: grid;
+  place-items: center;
+  font:
+    11px "DM Mono",
+    monospace;
+  color: #687050;
+}
+.person-name {
+  font-size: 13px;
+  flex: 1;
+}
+.share > strong {
+  font-size: 13px;
+  min-width: 62px;
+  text-align: right;
+}
+.paid {
+  font-size: 11px;
+  color: #7d8865;
+  min-width: 91px;
+  text-align: right;
+}
+.paid i {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #8d9a6b;
+  margin-right: 4px;
+}
+.pay-button {
+  margin-left: 10px;
+  min-width: 91px;
+  height: 30px;
+  padding: 0 10px;
+  font-size: 10px;
+}
+.state {
+  padding: 36px;
+  text-align: center;
+  color: #89897f;
+  font-size: 13px;
+}
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #deded5;
+  border-top-color: #7e8764;
+  border-radius: 50%;
+  vertical-align: middle;
+  margin-right: 8px;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+footer {
+  max-width: 900px;
+  margin: 60px auto 0;
+  padding: 20px 0;
+  border-top: 1px solid #e5e3dc;
+  display: flex;
+  justify-content: space-between;
+  font:
+    9px "DM Mono",
+    monospace;
+  letter-spacing: 0.8px;
+  color: #929187;
+}
+.shell footer span + span {
+  letter-spacing: 0;
+  font:
+    italic 12px "Playfair Display",
+    serif;
+  color: #8b8d7b;
+}
+@media (max-width: 720px) {
+  .top {
+    height: 62px;
+    padding: 0 20px;
+  }
+  .top-note {
+    display: none;
+  }
+  .shell {
+    padding: 48px 18px 0;
+  }
+  .intro {
+    margin-bottom: 38px;
+  }
+  h1 {
+    letter-spacing: -2.5px;
+  }
+  .setup {
+    display: block;
+    padding: 24px;
+  }
+  .setup .form-row {
+    min-width: 0;
+    margin-top: 20px;
+  }
+  .forms-grid {
+    grid-template-columns: 1fr;
+  }
+  .mini-form {
+    padding: 20px;
+  }
+  .mini-form .form-row {
+    gap: 6px;
+  }
+  .mini-form button {
+    padding: 0 9px;
+    font-size: 11px;
+  }
+  .amount-input {
+    max-width: 83px;
+  }
+  .bills-section {
+    margin-top: 38px;
+  }
+  .section-heading {
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .muted {
+    max-width: 130px;
+    text-align: right;
+    line-height: 1.5;
+  }
+  .share {
+    padding: 0 13px;
+    gap: 8px;
+  }
+  .pay-button {
+    margin-left: 2px;
+    min-width: 79px;
+    padding: 0 6px;
+  }
+  .bill-head {
+    padding: 16px;
+  }
+  .person-name {
+    font-size: 12px;
+  }
+  .paid {
+    min-width: 75px;
+  }
+  footer {
+    margin-top: 42px;
+  }
+}

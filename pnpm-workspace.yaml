@@ -1,0 +1,7 @@
+packages:
+  - api
+  - web
+allowBuilds:
+  esbuild: true
+  sharp: false
+  workerd: true
