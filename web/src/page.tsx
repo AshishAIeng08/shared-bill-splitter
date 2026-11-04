@@ -5,6 +5,7 @@ type User = {
   fullName: string;
   email: string;
   emailVerified: boolean;
+  isGuest?: boolean;
 };
 type Group = { id: string; name: string; role?: string; memberCount?: number };
 type Member = { id: string; fullName: string; email: string; role: string };
@@ -281,6 +282,26 @@ export function HomePage() {
       setUser(res.user);
       await loadGroups(res.user.id);
     });
+  }
+  async function continueAsGuest() {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const res = await api<{ user: User }>("/auth/guest", {
+        method: "POST",
+        body: JSON.stringify({ fullName: "Guest" }),
+      });
+      setUser(res.user);
+      await loadGroups(res.user.id);
+      setNotice("You’re using guest access. Sign out to end this session.");
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Could not start guest access.",
+      );
+    } finally {
+      setBusy(false);
+    }
   }
   async function resendVerification() {
     const address = document.querySelector<HTMLInputElement>(
@@ -588,6 +609,14 @@ export function HomePage() {
                     Create an account
                   </button>
                 </span>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={continueAsGuest}
+                  disabled={busy}
+                >
+                  Continue as guest — no email needed
+                </button>
               </>
             ) : (
               <button
@@ -704,7 +733,9 @@ export function HomePage() {
             </span>
             <span>
               <b>{user.fullName}</b>
-              <small>{user.email}</small>
+              <small>
+                {user.isGuest ? "Guest access · no email" : user.email}
+              </small>
             </span>
           </div>
           <button type="button" className="text-button logout" onClick={logout}>

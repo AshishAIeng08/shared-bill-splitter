@@ -13,6 +13,7 @@ type User = {
   full_name: string;
   email: string;
   email_verified_at: string | null;
+  is_guest?: number;
 };
 // Cloudflare Workers WebCrypto currently caps PBKDF2 at 100,000 iterations.
 const PASSWORD_ITERATIONS = 100_000;
@@ -84,11 +85,18 @@ const email = (value: unknown): value is string =>
   typeof value === "string" &&
   value.length <= 254 &&
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-const userView = ({ id, full_name, email, email_verified_at }: User) => ({
+const userView = ({
+  id,
+  full_name,
+  email,
+  email_verified_at,
+  is_guest,
+}: User) => ({
   id,
   fullName: full_name,
   email,
   emailVerified: Boolean(email_verified_at),
+  isGuest: Boolean(is_guest),
 });
 function setSession(c: AppContext, value: string) {
   c.header(
@@ -159,7 +167,7 @@ async function currentUser(c: AppContext) {
     ?.slice(8);
   if (!value) return null;
   const row = await c.env.DB.prepare(
-    "SELECT u.id, u.full_name, u.email, u.email_verified_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?",
+    "SELECT u.id, u.full_name, u.email, u.email_verified_at, u.is_guest FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?",
   )
     .bind(await digest(value), new Date().toISOString())
     .first<User>();
@@ -223,7 +231,8 @@ async function notification(
   )
     .bind(id, recipient.id, kind, subject, body, resourceId)
     .run();
-  await sendEmail(c, recipient.email, subject, emailHtml, kind, resourceId);
+  if (!recipient.email.endsWith("@guest.common.invalid"))
+    await sendEmail(c, recipient.email, subject, emailHtml, kind, resourceId);
 }
 app.onError((error, c) => {
   console.error(error);
@@ -231,6 +240,46 @@ app.onError((error, c) => {
 });
 app.notFound((c) => c.json({ error: "Not found" }, 404));
 app.get("/health", (c) => c.json({ status: "ok" }));
+
+app.post("/auth/guest", async (c) => {
+  const b = await bodyRecord(c.req.raw);
+  const fullName = b && text(b.fullName, 120) ? b.fullName.trim() : "Guest";
+  const id = crypto.randomUUID();
+  const guestEmail = `guest-${id}@guest.common.invalid`;
+  // Guest identities have no password and cannot receive email. The random
+  // address satisfies the existing unique identity constraint without using
+  // a real person's address.
+  await c.env.DB.prepare(
+    "INSERT INTO users (id, full_name, email, password_hash, email_verified_at, is_guest) VALUES (?, ?, ?, ?, ?, 1)",
+  )
+    .bind(
+      id,
+      fullName,
+      guestEmail,
+      `guest$${token()}`,
+      new Date().toISOString(),
+    )
+    .run();
+  const secret = token();
+  await c.env.DB.prepare(
+    "INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)",
+  )
+    .bind(await digest(secret), id, nowPlus(168))
+    .run();
+  setSession(c, secret);
+  return c.json(
+    {
+      user: userView({
+        id,
+        full_name: fullName,
+        email: guestEmail,
+        email_verified_at: new Date().toISOString(),
+        is_guest: 1,
+      }),
+    },
+    201,
+  );
+});
 
 app.post("/auth/register", async (c) => {
   const b = await bodyRecord(c.req.raw);
