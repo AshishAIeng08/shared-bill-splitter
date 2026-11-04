@@ -25,6 +25,7 @@ type Expense = {
   category: string;
   description?: string;
   splitType: string;
+  createdBy: string;
   createdByName: string;
   participants: Participant[];
 };
@@ -89,6 +90,7 @@ export function HomePage() {
     Array<{ id: string; fullName: string; email: string; netCents: number }>
   >([]);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [editingExpense, setEditingExpense] = useState<string | null>(null);
   const [authMode, setAuthMode] = useState<
     "login" | "register" | "forgot" | "reset"
   >("login");
@@ -380,6 +382,43 @@ export function HomePage() {
       await openGroup(group);
       formElement.reset();
     });
+  }
+  async function updateExpense(event: FormEvent, expenseId: string) {
+    if (!group) return;
+    const formElement = event.currentTarget as HTMLFormElement;
+    await run(event, async (form) => {
+      await api(`/expenses/${expenseId}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          title: inputString(form, "title"),
+          totalCents: Math.round(Number(form.get("amount")) * 100),
+        }),
+      });
+      setEditingExpense(null);
+      setNotice("Expense updated and members notified.");
+      await openGroup(group);
+      formElement.reset();
+    });
+  }
+  async function deleteExpense(expenseId: string) {
+    if (
+      !group ||
+      !window.confirm("Delete this expense? This updates group balances.")
+    )
+      return;
+    setBusy(true);
+    setError("");
+    try {
+      await api(`/expenses/${expenseId}`, { method: "DELETE" });
+      setNotice("Expense deleted and group members notified.");
+      await openGroup(group);
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Could not delete the expense.",
+      );
+    } finally {
+      setBusy(false);
+    }
   }
   async function logout() {
     await api("/auth/logout", { method: "POST" });
@@ -939,21 +978,83 @@ export function HomePage() {
                 {expenses.map((expense) => (
                   <article className="expense-row" key={expense.id}>
                     <span className="expense-icon">↗</span>
-                    <div className="expense-info">
-                      <b>{expense.title}</b>
-                      <small>
-                        {expense.paidByName} paid · {expense.expenseDate} ·
-                        added by {expense.createdByName}
-                      </small>
-                      <div className="expense-participants">
-                        {expense.participants.map((p) => (
-                          <span key={p.userId}>
-                            {p.fullName}: {currency(p.shareCents)}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <strong>{currency(expense.totalCents)}</strong>
+                    {editingExpense === expense.id ? (
+                      <form
+                        className="expense-info edit-expense"
+                        onSubmit={(event) => updateExpense(event, expense.id)}
+                      >
+                        <input
+                          name="title"
+                          aria-label="Expense title"
+                          defaultValue={expense.title}
+                          required
+                          maxLength={200}
+                        />
+                        <input
+                          name="amount"
+                          aria-label="Expense amount in rupees"
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          defaultValue={(expense.totalCents / 100).toFixed(2)}
+                          required
+                        />
+                        <div className="expense-controls">
+                          <button
+                            type="submit"
+                            className="primary"
+                            disabled={busy}
+                          >
+                            Save changes
+                          </button>
+                          <button
+                            type="button"
+                            className="text-button"
+                            onClick={() => setEditingExpense(null)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <>
+                        <div className="expense-info">
+                          <b>{expense.title}</b>
+                          <small>
+                            {expense.paidByName} paid · {expense.expenseDate} ·
+                            added by {expense.createdByName}
+                          </small>
+                          <div className="expense-participants">
+                            {expense.participants.map((p) => (
+                              <span key={p.userId}>
+                                {p.fullName}: {currency(p.shareCents)}
+                              </span>
+                            ))}
+                          </div>
+                          {(expense.createdBy === user.id ||
+                            group.role === "admin") && (
+                            <div className="expense-controls">
+                              <button
+                                type="button"
+                                className="text-button"
+                                onClick={() => setEditingExpense(expense.id)}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                className="text-button delete-button"
+                                disabled={busy}
+                                onClick={() => deleteExpense(expense.id)}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <strong>{currency(expense.totalCents)}</strong>
+                      </>
+                    )}
                   </article>
                 ))}
                 {expenses.length === 0 && (

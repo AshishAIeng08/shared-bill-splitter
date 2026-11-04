@@ -872,12 +872,14 @@ app.put("/expenses/:expenseId", auth, async (c) => {
   )
     return jsonError("Title and positive totalCents are required", 422);
   const participants = await c.env.DB.prepare(
-    "SELECT user_id AS userId FROM expense_participants WHERE expense_id = ? ORDER BY rowid",
+    "SELECT user_id AS userId, share_cents AS shareCents FROM expense_participants WHERE expense_id = ? ORDER BY rowid",
   )
     .bind(id)
-    .all<{ userId: string }>();
-  const base = Math.floor(Number(b.totalCents) / participants.results.length),
-    extra = Number(b.totalCents) % participants.results.length;
+    .all<{ userId: string; shareCents: number }>();
+  const revisedShares = prorata(
+    Number(b.totalCents),
+    participants.results.map((participant) => participant.shareCents),
+  );
   await c.env.DB.batch([
     c.env.DB.prepare(
       "UPDATE expenses SET title = ?, total_cents = ?, updated_at = ? WHERE id = ?",
@@ -885,7 +887,7 @@ app.put("/expenses/:expenseId", auth, async (c) => {
     ...participants.results.map((p, i) =>
       c.env.DB.prepare(
         "UPDATE expense_participants SET share_cents = ?, paid_at = NULL WHERE expense_id = ? AND user_id = ?",
-      ).bind(base + (i < extra ? 1 : 0), id, p.userId),
+      ).bind(revisedShares[i] ?? 0, id, p.userId),
     ),
   ]);
   await logActivity(

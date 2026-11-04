@@ -1088,6 +1088,17 @@ footer {
   font-size: 12px;
   white-space: nowrap;
 }
+.expense-controls {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+}
+.delete-button {
+  color: #a4472d;
+}
+.edit-expense input {
+  max-width: 270px;
+}
 .expense-participants {
   display: flex;
   flex-wrap: wrap;

@@ -233,4 +233,57 @@ describe("multi-user expense platform", () => {
       7501, 2500,
     ]);
   });
+
+  it("limits expense edits to the creator and preserves the split proportions", async () => {
+    const creator = await verifiedUser("Ira", "ira@example.com");
+    const friend = await verifiedUser("Omar", "omar@example.com");
+    const group = await json<{ id: string }>(
+      await fetchApi("/groups", {
+        method: "POST",
+        headers: { Cookie: creator.cookie },
+        body: JSON.stringify({ name: "Cabin" }),
+      }),
+    );
+    await env.DB.prepare(
+      "INSERT INTO group_members (group_id, user_id, role) VALUES (?, ?, 'member')",
+    )
+      .bind(group.id, friend.id)
+      .run();
+    const expense = await json<{ id: string }>(
+      await fetchApi(`/groups/${group.id}/expenses`, {
+        method: "POST",
+        headers: { Cookie: creator.cookie },
+        body: JSON.stringify({
+          title: "Food",
+          totalCents: 10000,
+          paidBy: creator.id,
+          participants: [
+            { userId: creator.id, value: 70 },
+            { userId: friend.id, value: 30 },
+          ],
+          splitType: "percentage",
+        }),
+      }),
+    );
+    const denied = await fetchApi(`/expenses/${expense.id}`, {
+      method: "PUT",
+      headers: { Cookie: friend.cookie },
+      body: JSON.stringify({ title: "Changed", totalCents: 20000 }),
+    });
+    expect(denied.status).toBe(403);
+    const updated = await fetchApi(`/expenses/${expense.id}`, {
+      method: "PUT",
+      headers: { Cookie: creator.cookie },
+      body: JSON.stringify({ title: "Food updated", totalCents: 20000 }),
+    });
+    expect(updated.status).toBe(200);
+    const participants = await env.DB.prepare(
+      "SELECT user_id AS userId, share_cents AS shareCents FROM expense_participants WHERE expense_id = ? ORDER BY rowid",
+    )
+      .bind(expense.id)
+      .all<{ userId: string; shareCents: number }>();
+    expect(participants.results.map((item) => item.shareCents)).toEqual([
+      14000, 6000,
+    ]);
+  });
 });
