@@ -153,6 +153,7 @@ export function HomePage() {
     const verify = params.get("verify"),
       reset = params.get("reset"),
       invite = params.get("invite");
+    const targetGroupId = params.get("group");
     if (invite) setInviteToken(invite);
     (async () => {
       if (verify) {
@@ -198,6 +199,12 @@ export function HomePage() {
           "/notifications",
         );
         if (alive) setNotifications(ns.notifications);
+        if (targetGroupId) {
+          const destination = data.groups.find(
+            (item) => item.id === targetGroupId,
+          );
+          if (destination) await openGroup(destination);
+        }
       } catch (e) {
         if (alive && verify)
           setError(e instanceof Error ? e.message : "Verification failed.");
@@ -208,7 +215,7 @@ export function HomePage() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [openGroup]);
 
   async function run(
     event: FormEvent,
@@ -272,6 +279,30 @@ export function HomePage() {
       setUser(res.user);
       await loadGroups(res.user.id);
     });
+  }
+  async function resendVerification() {
+    const address = document.querySelector<HTMLInputElement>(
+      '.auth-form input[name="email"]',
+    )?.value;
+    if (!address) {
+      setError("Enter your email address first.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const result = await api<{ message: string }>(
+        "/auth/resend-verification",
+        { method: "POST", body: JSON.stringify({ email: address }) },
+      );
+      setNotice(result.message);
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Could not send a verification email.",
+      );
+    } finally {
+      setBusy(false);
+    }
   }
   async function createGroup(event: FormEvent) {
     await run(event, async (form) => {
@@ -500,6 +531,13 @@ export function HomePage() {
                   onClick={() => setAuthMode("forgot")}
                 >
                   Forgot password?
+                </button>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={resendVerification}
+                >
+                  Resend verification email
                 </button>
                 <span>
                   New to Common?{" "}

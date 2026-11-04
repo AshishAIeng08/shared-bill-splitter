@@ -174,4 +174,63 @@ describe("multi-user expense platform", () => {
     });
     expect(response.status).toBe(422);
   });
+
+  it("allocates percentage and share splits in whole paise", async () => {
+    const payer = await verifiedUser("Mina", "mina@example.com");
+    const friend = await verifiedUser("Noah", "noah@example.com");
+    const group = await json<{ id: string }>(
+      await fetchApi("/groups", {
+        method: "POST",
+        headers: { Cookie: payer.cookie },
+        body: JSON.stringify({ name: "Trip" }),
+      }),
+    );
+    await env.DB.prepare(
+      "INSERT INTO group_members (group_id, user_id, role) VALUES (?, ?, 'member')",
+    )
+      .bind(group.id, friend.id)
+      .run();
+    const percentages = await json<{
+      participants: Array<{ userId: string; shareCents: number }>;
+    }>(
+      await fetchApi(`/groups/${group.id}/expenses`, {
+        method: "POST",
+        headers: { Cookie: payer.cookie },
+        body: JSON.stringify({
+          title: "Tickets",
+          totalCents: 10001,
+          paidBy: payer.id,
+          participants: [
+            { userId: payer.id, value: 70 },
+            { userId: friend.id, value: 30 },
+          ],
+          splitType: "percentage",
+        }),
+      }),
+    );
+    expect(percentages.participants.map((item) => item.shareCents)).toEqual([
+      7001, 3000,
+    ]);
+    const shares = await json<{
+      participants: Array<{ userId: string; shareCents: number }>;
+    }>(
+      await fetchApi(`/groups/${group.id}/expenses`, {
+        method: "POST",
+        headers: { Cookie: payer.cookie },
+        body: JSON.stringify({
+          title: "Hotel",
+          totalCents: 10001,
+          paidBy: payer.id,
+          participants: [
+            { userId: payer.id, value: 3 },
+            { userId: friend.id, value: 1 },
+          ],
+          splitType: "shares",
+        }),
+      }),
+    );
+    expect(shares.participants.map((item) => item.shareCents)).toEqual([
+      7501, 2500,
+    ]);
+  });
 });
