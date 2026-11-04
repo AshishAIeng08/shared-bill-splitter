@@ -14,6 +14,8 @@ type User = {
   email: string;
   email_verified_at: string | null;
 };
+// Cloudflare Workers WebCrypto currently caps PBKDF2 at 100,000 iterations.
+const PASSWORD_ITERATIONS = 100_000;
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>().basePath(
   "/api",
 );
@@ -49,16 +51,17 @@ async function passwordHash(password: string, salt = token()) {
       name: "PBKDF2",
       hash: "SHA-256",
       salt: new TextEncoder().encode(salt),
-      iterations: 210_000,
+      iterations: PASSWORD_ITERATIONS,
     },
     key,
     256,
   );
-  return `pbkdf2$210000$${salt}$${Array.from(new Uint8Array(bits), (b) => b.toString(16).padStart(2, "0")).join("")}`;
+  return `pbkdf2$${PASSWORD_ITERATIONS}$${salt}$${Array.from(new Uint8Array(bits), (b) => b.toString(16).padStart(2, "0")).join("")}`;
 }
 async function passwordMatches(password: string, encoded: string) {
   const [, rounds, salt, expected] = encoded.split("$");
-  if (!salt || !expected || Number(rounds) !== 210_000) return false;
+  if (!salt || !expected || Number(rounds) !== PASSWORD_ITERATIONS)
+    return false;
   return (await passwordHash(password, salt)).split("$")[3] === expected;
 }
 async function bodyRecord(
