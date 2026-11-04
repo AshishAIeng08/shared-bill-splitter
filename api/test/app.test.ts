@@ -7,18 +7,63 @@ declare module "cloudflare:test" {
     TEST_MIGRATIONS: Array<{ name: string; queries: string[] }>;
   }
 }
-
 async function json<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
+const fetchApi = (path: string, init?: RequestInit) =>
+  SELF.fetch(`https://app/api${path}`, init);
+async function verifiedUser(name: string, email: string) {
+  const response = await fetchApi("/auth/register", {
+    method: "POST",
+    body: JSON.stringify({
+      fullName: name,
+      email,
+      password: "correct-horse-battery-staple",
+    }),
+  });
+  // Email is intentionally unconfigured in test workers; the account remains pending verification.
+  expect(response.status).toBe(503);
+  await env.DB.prepare(
+    "UPDATE users SET email_verified_at = '2026-01-01T00:00:00Z' WHERE email = ?",
+  )
+    .bind(email)
+    .run();
+  const login = await fetchApi("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password: "correct-horse-battery-staple" }),
+  });
+  expect(login.status).toBe(200);
+  const cookie = login.headers.get("Set-Cookie")?.split(";")[0];
+  if (!cookie) throw new Error("Login did not create a session cookie");
+  return {
+    ...(
+      await json<{ user: { id: string; fullName: string; email: string } }>(
+        login,
+      )
+    ).user,
+    cookie,
+  };
+}
 
-describe("shared bill splitter", () => {
+describe("multi-user expense platform", () => {
   beforeAll(async () => {
     await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
   });
-
   beforeEach(async () => {
     await env.DB.batch([
+      env.DB.prepare("DELETE FROM email_logs"),
+      env.DB.prepare("DELETE FROM notifications"),
+      env.DB.prepare("DELETE FROM activity_logs"),
+      env.DB.prepare("DELETE FROM settlements"),
+      env.DB.prepare("DELETE FROM expense_participants"),
+      env.DB.prepare("DELETE FROM expenses"),
+      env.DB.prepare("DELETE FROM invitations"),
+      env.DB.prepare("DELETE FROM group_members"),
+      env.DB.prepare("DELETE FROM groups"),
+      env.DB.prepare("DELETE FROM sessions"),
+      env.DB.prepare("DELETE FROM verification_tokens"),
+      env.DB.prepare("DELETE FROM password_reset_tokens"),
+      env.DB.prepare("DELETE FROM users"),
       env.DB.prepare("DELETE FROM shares"),
       env.DB.prepare("DELETE FROM bills"),
       env.DB.prepare("DELETE FROM members"),
@@ -26,96 +71,107 @@ describe("shared bill splitter", () => {
     ]);
   });
 
-  it("creates homes and ordered members, then splits remainder cents by signup order", async () => {
-    const home = await json<{ id: string }>(
-      await SELF.fetch("https://app/api/homes", {
-        method: "POST",
-        body: JSON.stringify({ name: "Maple House" }),
+  it("enforces unique verified identities and rejects weak passwords", async () => {
+    const invalid = await fetchApi("/auth/register", {
+      method: "POST",
+      body: JSON.stringify({
+        fullName: "A",
+        email: "a@example.com",
+        password: "weak",
       }),
-    );
-    expect(
-      (
-        await SELF.fetch(`https://app/api/homes/${home.id}/members`, {
-          method: "POST",
-          body: JSON.stringify({ name: "Ada" }),
-        })
-      ).status,
-    ).toBe(201);
-    expect(
-      (
-        await SELF.fetch(`https://app/api/homes/${home.id}/members`, {
-          method: "POST",
-          body: JSON.stringify({ name: "Sam" }),
-        })
-      ).status,
-    ).toBe(201);
-    const last = await SELF.fetch(`https://app/api/homes/${home.id}/members`, {
-      method: "POST",
-      body: JSON.stringify({ name: "Lee" }),
     });
-    expect(last.status).toBe(201);
-    const made = await SELF.fetch(`https://app/api/homes/${home.id}/bills`, {
+    expect(invalid.status).toBe(422);
+    await verifiedUser("Asha", "asha@example.com");
+    const duplicate = await fetchApi("/auth/register", {
       method: "POST",
-      body: JSON.stringify({ title: "Groceries", totalCents: 1000 }),
+      body: JSON.stringify({
+        fullName: "Other",
+        email: "ASHA@example.com",
+        password: "correct-horse-battery-staple",
+      }),
     });
-    expect(made.status).toBe(201);
-    const bill = await json<{ shares: Array<{ amountCents: number }> }>(made);
-    expect(bill.shares.map((share) => share.amountCents)).toEqual([
-      334, 333, 333,
-    ]);
+    expect(duplicate.status).toBe(409);
   });
 
-  it("rejects a bill for an empty home and invalid amounts", async () => {
-    const home = await json<{ id: string }>(
-      await SELF.fetch("https://app/api/homes", {
+  it("isolates groups, splits money correctly, and records creator activity", async () => {
+    const asha = await verifiedUser("Asha", "asha@example.com");
+    const amit = await verifiedUser("Amit", "amit@example.com");
+    const group = await json<{ id: string }>(
+      await fetchApi("/groups", {
         method: "POST",
-        body: JSON.stringify({ name: "Empty" }),
+        headers: { Cookie: asha.cookie },
+        body: JSON.stringify({ name: "Friends" }),
+      }),
+    );
+    await env.DB.prepare(
+      "INSERT INTO group_members (group_id, user_id, role) VALUES (?, ?, 'member')",
+    )
+      .bind(group.id, amit.id)
+      .run();
+    const expense = await fetchApi(`/groups/${group.id}/expenses`, {
+      method: "POST",
+      headers: { Cookie: asha.cookie },
+      body: JSON.stringify({
+        title: "Dinner",
+        totalCents: 10001,
+        paidBy: asha.id,
+        participants: [asha.id, amit.id],
+        splitType: "equal",
+      }),
+    });
+    expect(expense.status).toBe(201);
+    const balances = await json<{
+      balances: Array<{ id: string; netCents: number }>;
+    }>(
+      await fetchApi(`/groups/${group.id}/balances`, {
+        headers: { Cookie: asha.cookie },
       }),
     );
     expect(
-      (
-        await SELF.fetch(`https://app/api/homes/${home.id}/bills`, {
-          method: "POST",
-          body: JSON.stringify({ title: "Rent", totalCents: 1 }),
-        })
-      ).status,
-    ).toBe(422);
+      balances.balances.find((item) => item.id === asha.id)?.netCents,
+    ).toBe(5000);
+    expect(
+      balances.balances.find((item) => item.id === amit.id)?.netCents,
+    ).toBe(-5000);
+    const hidden = await fetchApi(`/groups/${group.id}`, {
+      headers: {
+        Cookie: (await verifiedUser("Ravi", "ravi@example.com")).cookie,
+      },
+    });
+    expect(hidden.status).toBe(404);
+    const activity = await json<{
+      activity: Array<{ actorName: string; action: string }>;
+    }>(
+      await fetchApi(`/groups/${group.id}/activity`, {
+        headers: { Cookie: asha.cookie },
+      }),
+    );
+    expect(activity.activity[0]).toMatchObject({
+      actorName: "Asha",
+      action: "created",
+    });
   });
 
-  it("makes payments idempotent and rejects a different key after payment", async () => {
-    const home = await json<{ id: string }>(
-      await SELF.fetch("https://app/api/homes", {
+  it("rejects exact split totals that do not equal the expense total", async () => {
+    const user = await verifiedUser("Lee", "lee@example.com");
+    const group = await json<{ id: string }>(
+      await fetchApi("/groups", {
         method: "POST",
-        body: JSON.stringify({ name: "Home" }),
+        headers: { Cookie: user.cookie },
+        body: JSON.stringify({ name: "Flat" }),
       }),
     );
-    await SELF.fetch(`https://app/api/homes/${home.id}/members`, {
+    const response = await fetchApi(`/groups/${group.id}/expenses`, {
       method: "POST",
-      body: JSON.stringify({ name: "Jo" }),
-    });
-    const bill = await json<{ id: string; shares: Array<{ id: string }> }>(
-      await SELF.fetch(`https://app/api/homes/${home.id}/bills`, {
-        method: "POST",
-        body: JSON.stringify({ title: "Tea", totalCents: 120 }),
+      headers: { Cookie: user.cookie },
+      body: JSON.stringify({
+        title: "Rent",
+        totalCents: 10000,
+        paidBy: user.id,
+        participants: [{ userId: user.id, value: 5000 }],
+        splitType: "exact",
       }),
-    );
-    const url = `https://app/api/bills/${bill.id}/shares/${bill.shares[0]?.id}/pay`;
-    const pay = () =>
-      SELF.fetch(url, {
-        method: "POST",
-        headers: { "Idempotency-Key": "once" },
-      });
-    const first = await pay();
-    const second = await pay();
-    expect(first.status).toBe(200);
-    expect(await json(second)).toEqual(await json(first));
-    expect(
-      (
-        await SELF.fetch(url, {
-          method: "POST",
-          headers: { "Idempotency-Key": "different" },
-        })
-      ).status,
-    ).toBe(409);
+    });
+    expect(response.status).toBe(422);
   });
 });

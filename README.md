@@ -1,6 +1,6 @@
-# Common · Shared Bill Splitter
+# Common · Shared Expense Manager
 
-A small household bill splitter built with Hono on Cloudflare Workers, D1, React, Vite, TanStack Router, and TypeScript.
+Common is a multi-user expense sharing app built with React, TypeScript, Hono, Cloudflare Workers, and D1. It supports individual accounts, email verification, shared groups, email invitations, split expenses, balances, settlement records, in-app notifications, and activity history.
 
 ## Run locally
 
@@ -11,27 +11,48 @@ pnpm install
 pnpm dev
 ```
 
-The web app runs at <http://localhost:5173> and the API at <http://localhost:8787>. Wrangler applies the D1 migrations to its local database. Run `pnpm check`, `pnpm typecheck`, `pnpm test`, and `pnpm build` from the root to check the project.
+The web app runs at <http://localhost:5173> and the API at <http://localhost:8787>. Vite proxies `/api` to the local Worker.
 
-## API
+## Email delivery setup
 
-- `POST /api/homes` creates a home.
-- `POST /api/homes/:homeId/members` adds a member.
-- `POST /api/homes/:homeId/bills` splits a positive integer cent amount in member signup order.
-- `POST /api/bills/:billId/shares/:shareId/pay` settles a share with an `Idempotency-Key` header.
-- `GET /api/homes/:homeId/bills` lists bills and shares for the web page.
-- `GET /api/homes/:homeId/balances` lists outstanding integer-cent balances in member order.
+Email verification, password resets, group invitations, expense alerts, and settlement confirmations use [Resend](https://resend.com/). Create a Resend API key and verify a sender domain, then set these Worker secrets:
 
-## Decisions
+```sh
+cd api
+pnpm exec wrangler secret put RESEND_API_KEY
+pnpm exec wrangler secret put EMAIL_FROM
+pnpm exec wrangler secret put APP_URL
+```
 
-1. **Store money as integer cents.** This avoids floating point rounding; the remainder is assigned one cent at a time in member creation order.
-2. **Protect relationships and values in SQLite.** Foreign keys, unique keys, and `CHECK` constraints keep invalid data out even if a future API path is added.
-3. **Claim a payment with one conditional update.** `UPDATE ... WHERE paid_at IS NULL` makes concurrent payment attempts race safely; the idempotency key lets a retry return the original payment result.
+`EMAIL_FROM` must be a verified Resend sender, for example `Common <updates@example.com>`. `APP_URL` is the public app origin and should not include a trailing slash. Never commit credentials. Without email secrets, registration remains unverified, password reset and invite emails are not sent, and the UI reports that email delivery needs configuration.
 
-## Assignment walkthrough
+## Database
 
-The browser calls the Hono API through Vite's `/api` proxy. The API validates input, writes the bill and all shares in one D1 batch, and uses a guarded update for payment. The UI retains the unpaid state until the server confirms success; transport and API errors show an alert while the existing bill stays visible.
+Cloudflare D1 migrations live in `api/migrations`. The production D1 database is provisioned and its schema applied with:
 
-**AI assistance:** OpenAI Codex was used to draft and refine this project. I reviewed the implementation and should be ready to explain its validation, schema constraints, split calculation, and payment flow in the walkthrough video.
+```sh
+cd api
+pnpm exec wrangler d1 migrations apply shared-bill-splitter --remote
+```
 
-**Walkthrough video:** Add a public, viewable video link here before submitting the application.
+Local development and tests use Wrangler's local D1 database.
+
+## Checks
+
+```sh
+pnpm check
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+## Security notes
+
+- Passwords are stored as salted PBKDF2-SHA-256 hashes; session and one-time token values are random and only their SHA-256 hashes are stored.
+- Sessions use `HttpOnly`, `Secure`, and `SameSite=Strict` cookies. Private routes enforce verified identity and group membership on the Worker.
+- Expense amounts use integer paise. Percentage and share splits distribute remainder paise deterministically; exact splits must add to the bill total.
+- Expense actions and email sends are recorded in the database. Email delivery uses recipient addresses loaded from registered accounts, not user-entered names.
+
+## Current deployment
+
+The live Worker URL is <https://shared-bill-splitter-api.ashish1053singh.workers.dev>. Configure the email secrets above on the Cloudflare Worker before inviting real users to register.

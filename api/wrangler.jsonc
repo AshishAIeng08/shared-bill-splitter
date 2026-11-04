@@ -13,6 +13,7 @@
     {
       "binding": "DB",
       "database_name": "shared-bill-splitter",
+      "database_id": "804a78a1-7615-4fd1-a37d-c4e0c6019d5b",
       "migrations_dir": "migrations"
     }
   ]
